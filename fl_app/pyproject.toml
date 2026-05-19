@@ -1,0 +1,60 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "fl-dist-demo"
+version = "1.0.0"
+description = "Distributed Federated Learning demo with Flower"
+license = "Apache-2.0"
+requires-python = ">=3.10"
+dependencies = ["flwr>=1.15.0,<2.0.0", "numpy>=1.26.0"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["fl_app"]
+
+# ---------------------------------------------------------------------------
+# Flower App
+# ---------------------------------------------------------------------------
+[tool.flwr.app]
+publisher = "demo"
+
+[tool.flwr.app.components]
+serverapp = "fl_app.server_app:app"
+clientapp = "fl_app.client_app:app"
+
+[tool.flwr.app.config]
+num-server-rounds = 5
+min-clients = 2
+
+# ---------------------------------------------------------------------------
+# Federations
+# ---------------------------------------------------------------------------
+
+#######################################################################
+# CONFIGURATION MIGRATION NOTICE:
+#
+# What was previously called "federation config" for SuperLink
+# connections in pyproject.toml has been renamed and moved.
+#
+# These settings are now **SuperLink connection configuration**
+# and are defined in the Flower configuration file.
+#
+# The entries below are commented out intentionally and are kept
+# only as a migration reference.
+#
+# Docs: https://flower.ai/docs/framework/ref-flower-configuration.html
+#######################################################################
+
+# [tool.flwr.federations]
+# default = "local-sim"
+
+# # Local simulation — no external processes needed, useful for quick tests.
+# [tool.flwr.federations.local-sim]
+# options.num-supernodes = 2
+
+# # Distributed — update `address` to point to your SuperLink machine.
+# # The notebook updates this automatically when you set SUPERLINK_IP.
+# [tool.flwr.federations.distributed]
+# address = "127.0.0.1:9093"
+# insecure = true

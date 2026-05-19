@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Jupyter
+.ipynb_checkpoints/
+
+# MedMNIST downloaded datasets
+*.npz
+
+# Generated outputs
+*.png
+*.pt
+*.pth
+
+# Flower runtime
+.flwr/
+*.fab
+
+# OS
+.DS_Store
+Thumbs.db

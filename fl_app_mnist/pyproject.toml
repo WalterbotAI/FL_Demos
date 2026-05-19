@@ -1,0 +1,31 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "fl-dist-demo-mnist"
+version = "1.0.0"
+description = "Distributed FL demo with Flower — MNIST + CNN"
+license = "Apache-2.0"
+requires-python = ">=3.10"
+dependencies = [
+    "flwr>=1.15.0,<2.0.0",
+    "torch>=2.0.0",
+    "torchvision>=0.15.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["fl_app_mnist"]
+
+[tool.flwr.app]
+publisher = "demo"
+
+[tool.flwr.app.components]
+serverapp = "fl_app_mnist.server_app:app"
+clientapp = "fl_app_mnist.client_app:app"
+
+[tool.flwr.app.config]
+num-server-rounds = 5
+min-clients = 2
+num-partitions = 2
+max-samples = 2000
