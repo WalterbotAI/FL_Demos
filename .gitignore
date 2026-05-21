@@ -2,12 +2,14 @@
 __pycache__/
 *.py[cod]
 *.pyo
+.venv*/
 
 # Jupyter
 .ipynb_checkpoints/
 
 # MedMNIST downloaded datasets
 *.npz
+.data/
 
 # Generated outputs
 *.png

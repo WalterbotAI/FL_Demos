@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
+import os
+import warnings
+from pathlib import Path
 from typing import List, Tuple
+
+os.environ.setdefault("MEDMNIST_ROOT", str(Path(".data/medmnist").resolve()))
+warnings.filterwarnings("ignore", message="Failed to setup default root.")
 
 import numpy as np
 import torch
@@ -21,6 +27,7 @@ TASK       = _info["task"]
 N_CHANNELS = _info["n_channels"]
 N_CLASSES  = len(_info["label"])
 DataClass  = getattr(medmnist, _info["python_class"])
+DATA_ROOT = Path(os.environ["MEDMNIST_ROOT"]).resolve()
 
 
 # ── Transform ─────────────────────────────────────────────────────────────────
@@ -71,8 +78,9 @@ def load_data(
     val_bs: int = 512,
 ) -> Tuple[DataLoader, DataLoader]:
     """Return train/val DataLoaders for the given client partition."""
-    raw_train = DataClass(split="train", download=True)
-    raw_val   = DataClass(split="val",   download=True)
+    DATA_ROOT.mkdir(parents=True, exist_ok=True)
+    raw_train = DataClass(split="train", download=True, root=str(DATA_ROOT))
+    raw_val   = DataClass(split="val",   download=True, root=str(DATA_ROOT))
 
     n_total   = len(raw_train)
     per_slice = n_total // num_partitions
