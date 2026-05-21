@@ -1,0 +1,7 @@
+flwr[simulation]>=1.21,<2.0
+ipykernel
+medmnist==3.0.2
+notebook
+numpy>=1.26
+torch
+torchvision

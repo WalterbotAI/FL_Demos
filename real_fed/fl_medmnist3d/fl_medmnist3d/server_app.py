@@ -1,31 +1,40 @@
-"""ServerApp: FedAvg aggregation for MedMNIST 3D."""
+"""ServerApp: Message API FedAvg aggregation for MedMNIST 3D."""
 
 from __future__ import annotations
 
-from flwr.common import Context, ndarrays_to_parameters
-from flwr.server import ServerApp, ServerAppComponents, ServerConfig
-from flwr.server.strategy import FedAvg
+from flwr.app import ArrayRecord, ConfigRecord, Context
+from flwr.serverapp import Grid, ServerApp
+from flwr.serverapp.strategy import FedAvg
 
-from fl_medmnist3d.task import Net3D, get_parameters
+from fl_medmnist3d.task import Net3D
 
 
-def server_fn(context: Context) -> ServerAppComponents:
-    num_rounds  = int(context.run_config.get("num-server-rounds", 3))
+app = ServerApp()
+
+
+@app.main()
+def main(grid: Grid, context: Context) -> None:
+    """Run FedAvg over Message API ClientApps."""
+    num_rounds = int(context.run_config.get("num-server-rounds", 3))
     min_clients = int(context.run_config.get("min-clients", 2))
+    local_epochs = int(context.run_config.get("local-epochs", 1))
+    lr = float(context.run_config.get("learning-rate", 0.001))
 
     strategy = FedAvg(
-        fraction_fit=1.0,
+        fraction_train=1.0,
         fraction_evaluate=1.0,
-        min_fit_clients=min_clients,
-        min_evaluate_clients=min_clients,
-        min_available_clients=min_clients,
-        initial_parameters=ndarrays_to_parameters(get_parameters(Net3D())),
+        min_train_nodes=min_clients,
+        min_evaluate_nodes=min_clients,
+        min_available_nodes=min_clients,
     )
 
-    return ServerAppComponents(
-        strategy=strategy,
-        config=ServerConfig(num_rounds=num_rounds),
+    initial_arrays = ArrayRecord(torch_state_dict=Net3D().state_dict())
+    train_config = ConfigRecord({"local-epochs": local_epochs, "learning-rate": lr})
+
+    result = strategy.start(
+        grid=grid,
+        initial_arrays=initial_arrays,
+        num_rounds=num_rounds,
+        train_config=train_config,
     )
-
-
-app = ServerApp(server_fn=server_fn)
+    print(result)

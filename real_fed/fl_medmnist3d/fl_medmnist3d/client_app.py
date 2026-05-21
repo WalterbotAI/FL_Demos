@@ -1,57 +1,65 @@
-"""ClientApp: MedMNIST 3D training on each SuperNode."""
+"""ClientApp: MedMNIST 3D training using Flower's Message API."""
 
 from __future__ import annotations
 
 import torch
-from flwr.client import ClientApp, NumPyClient
-from flwr.common import Context
+from flwr.app import ArrayRecord, Context, Message, MetricRecord, RecordDict
+from flwr.clientapp import ClientApp
 
-from fl_medmnist3d.task import (
-    Net3D,
-    evaluate,
-    get_parameters,
-    load_data,
-    set_parameters,
-    train,
-)
+from fl_medmnist3d.task import Net3D, evaluate, load_data, train
 
 
-class MedMNISTClient(NumPyClient):
-    def __init__(
-        self,
-        partition_id: int,
-        num_partitions: int,
-        local_epochs: int,
-        lr: float,
-    ) -> None:
-        self.device       = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.local_epochs = local_epochs
-        self.lr           = lr
-        self.trainloader, self.valloader = load_data(partition_id, num_partitions)
-        self.model = Net3D().to(self.device)
-
-    def get_parameters(self, config):
-        return get_parameters(self.model)
-
-    def fit(self, parameters, config):
-        set_parameters(self.model, parameters)
-        metrics = train(self.model, self.trainloader, self.device, self.local_epochs, self.lr)
-        return get_parameters(self.model), len(self.trainloader.dataset), metrics
-
-    def evaluate(self, parameters, config):
-        set_parameters(self.model, parameters)
-        loss, num_examples, metrics = evaluate(self.model, self.valloader, self.device)
-        return loss, num_examples, metrics
+app = ClientApp()
 
 
-def client_fn(context: Context):
+def _partition_id(context: Context, num_partitions: int) -> int:
+    """Return a bounded partition id for local simulation and SuperNode runs."""
+    configured = context.node_config.get("partition-id")
+    if configured is not None:
+        return int(configured)
+    return int(context.node_id) % num_partitions
+
+
+@app.train()
+def train_message(msg: Message, context: Context) -> Message:
+    """Train locally and return updated arrays plus weighted metrics."""
+    config = msg.content.get("config", {})
     num_partitions = int(context.run_config.get("num-partitions", 2))
-    local_epochs   = int(context.run_config.get("local-epochs", 1))
-    lr             = float(context.run_config.get("learning-rate", 0.001))
-    # node_id is a large integer assigned by SuperLink; modulo keeps it bounded.
-    partition_id   = int(context.node_id) % num_partitions
+    local_epochs = int(config.get("local-epochs", context.run_config.get("local-epochs", 1)))
+    lr = float(config.get("learning-rate", context.run_config.get("learning-rate", 0.001)))
+    partition_id = _partition_id(context, num_partitions)
 
-    return MedMNISTClient(partition_id, num_partitions, local_epochs, lr).to_client()
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    trainloader, _ = load_data(partition_id, num_partitions)
+    model = Net3D().to(device)
+    model.load_state_dict(msg.content["arrays"].to_torch_state_dict())
+
+    metrics = train(model, trainloader, device, local_epochs, lr)
+    metrics["num-examples"] = len(trainloader.dataset)
+
+    content = RecordDict(
+        {
+            "arrays": ArrayRecord(torch_state_dict=model.state_dict()),
+            "metrics": MetricRecord(metrics),
+        }
+    )
+    return Message(content=content, reply_to=msg)
 
 
-app = ClientApp(client_fn=client_fn)
+@app.evaluate()
+def evaluate_message(msg: Message, context: Context) -> Message:
+    """Evaluate locally and return weighted metrics."""
+    num_partitions = int(context.run_config.get("num-partitions", 2))
+    partition_id = _partition_id(context, num_partitions)
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    _, valloader = load_data(partition_id, num_partitions)
+    model = Net3D().to(device)
+    model.load_state_dict(msg.content["arrays"].to_torch_state_dict())
+
+    loss, num_examples, metrics = evaluate(model, valloader, device)
+    metrics["eval_loss"] = loss
+    metrics["num-examples"] = num_examples
+
+    content = RecordDict({"metrics": MetricRecord(metrics)})
+    return Message(content=content, reply_to=msg)

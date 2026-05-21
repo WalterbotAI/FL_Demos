@@ -9,7 +9,7 @@ description = "Federated Learning on MedMNIST 3D (SynapseMNIST3D) with Flower"
 license = "Apache-2.0"
 requires-python = ">=3.10"
 dependencies = [
-    "flwr>=1.15.0,<2.0.0",
+    "flwr[simulation]>=1.21.0,<2.0.0",
     "numpy>=1.26.0",
     "torch>=2.0.0",
     "medmnist>=3.0.0",
